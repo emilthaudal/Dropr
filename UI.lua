@@ -174,23 +174,25 @@ local function EnsureImportFrame()
     hint:SetPoint("RIGHT",   importFrame, "RIGHT",   -PADDING, 0)
     hint:SetText("Paste your import string from dropr-web, then click Confirm.")
 
-    -- Edit box (AF multiline — has its own scroll, backdrop, focus handling)
-    -- Height = frame body minus hint row minus button row minus padding
+    -- Scrollable edit box — fixed height, scrolls internally
+    -- Height: frame body minus hint row (32px) minus button row (34px) minus padding
     local ebH = IMPORT_H - 32 - 34 - PADDING
-    importEditBox = AF.CreateEditBox(importFrame, nil, IMPORT_W - PADDING * 2, ebH, "multiline")
-    importEditBox:SetPoint("TOPLEFT",  importFrame, "TOPLEFT",  PADDING, -32)
-    importEditBox:SetPoint("RIGHT",    importFrame, "RIGHT",    -PADDING, 0)
+    local scrollEB = AF.CreateScrollEditBox(importFrame, nil, nil, IMPORT_W - PADDING * 2, ebH)
+    scrollEB:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -32)
+    scrollEB:SetPoint("RIGHT",   importFrame, "RIGHT",   -PADDING, 0)
+    -- .eb is the inner AF_EditBox; use it for GetText/SetText/SetFocus
+    importEditBox = scrollEB
 
     -- Confirm button
     local confirmBtn = AF.CreateButton(importFrame, "Confirm", "green", 100, 24)
     confirmBtn:SetPoint("BOTTOMRIGHT", importFrame, "BOTTOMRIGHT", -PADDING, PADDING)
     confirmBtn:SetScript("OnClick", function()
-        local str = importEditBox:GetText()
+        local str = scrollEB.eb:GetText()
         str = str:gsub("%s+", "")   -- strip any accidental whitespace/newlines
         if str ~= "" and _G.DroprImportData then
             _G.DroprImportData(str)
         end
-        importEditBox:SetText("")
+        scrollEB.eb:SetText("")
         importFrame:Hide()
     end)
 
@@ -198,7 +200,7 @@ local function EnsureImportFrame()
     local cancelBtn = AF.CreateButton(importFrame, "Cancel", "red", 80, 24)
     cancelBtn:SetPoint("RIGHT", confirmBtn, "LEFT", -6, 0)
     cancelBtn:SetScript("OnClick", function()
-        importEditBox:SetText("")
+        scrollEB.eb:SetText("")
         importFrame:Hide()
     end)
 end
