@@ -1,0 +1,35 @@
+# macOS
+.DS_Store
+
+# WoW runtime
+SavedVariables/
+
+# Packager/release outputs
+.release/
+*.zip
+.packager/
+
+# Libs directory — gitignored; packager fetches at release time
+Libs/
+
+# Upload tokens
+.env
+.token
+*.token
+
+# Misc
+*.bak
+*.backup
+*.orig
+*.log
+notes.txt
+TODO.txt
+*.local.lua
+
+# Tooling
+.opencode/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
