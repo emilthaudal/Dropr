@@ -219,6 +219,14 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
         if arg1 == DROPR_ADDON_NAME then
             DroprDB = DroprDB or {}
+            -- Verify json library loaded correctly. If not, the vendored
+            -- Libs/json.lua/json.lua is missing or stale in the WoW AddOns folder.
+            if not _G.json then
+                C_Timer.After(2, function()
+                    DroprPrint("|cffff4444WARNING:|r json library not found. Import will fail.")
+                    DroprPrint("Reinstall the addon — ensure the Libs/ folder is present.")
+                end)
+            end
             CheckStale()
         end
 
