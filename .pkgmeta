@@ -1,9 +1,1 @@
 package-as: Dropr
-
-externals:
-  Libs/json.lua:
-    url: https://github.com/rxi/json.lua
-    tag: latest
-
-embedded-libraries:
-  - json.lua

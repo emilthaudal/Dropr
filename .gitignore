@@ -9,9 +9,6 @@ SavedVariables/
 *.zip
 .packager/
 
-# Libs directory — gitignored; packager fetches at release time
-Libs/
-
 # Upload tokens
 .env
 .token
