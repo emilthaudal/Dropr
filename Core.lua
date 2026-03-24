@@ -5,6 +5,29 @@
 -- registered yet. Always look it up lazily inside functions that need it.
 
 -- ---------------------------------------------------------------------------
+-- WoW instanceID → Raidbots instanceId mapping
+-- WoW's GetInstanceInfo() returns WoW-native zone IDs which differ from
+-- Raidbots' own instanceId system used in the import payload.
+-- Run `/run print(select(8, GetInstanceInfo()))` in-game to find new IDs.
+-- ---------------------------------------------------------------------------
+
+DROPR_INSTANCE_MAP = {
+    -- Current M+ pool (Midnight Season 1)
+    [2526] = "1201",  -- Algeth'ar Academy
+    [658]  = "278",   -- Pit of Saron
+    [1753] = "945",   -- Seat of the Triumvirate
+    [1209] = "476",   -- Skyreach
+    -- New Midnight dungeons — WoW IDs TBD in-game; add as discovered:
+    -- [????] = "1299",  -- Windrunner Spire
+    -- [????] = "1300",  -- Magisters' Terrace
+    -- [????] = "1315",  -- Maisara Caverns
+    -- [????] = "1316",  -- Nexus-Point Xenas
+    -- [????] = "1311",  -- Den of Nalorakk
+    -- [????] = "1313",  -- Voidscar Arena
+    -- [????] = "1309",  -- The Blinding Vale
+}
+
+-- ---------------------------------------------------------------------------
 -- Base64 decode (WoW has no native base64; minimal RFC4648 implementation)
 -- ---------------------------------------------------------------------------
 
@@ -163,14 +186,19 @@ end
 -- Zone detection
 -- ---------------------------------------------------------------------------
 
----Returns the current M+ instance ID if the player is inside a tracked dungeon,
----or nil if not.
----@return string|nil instanceId
+---Returns the Raidbots instanceId string if the player is inside a tracked
+---dungeon, or nil if not. Translates WoW's native instanceID via DROPR_INSTANCE_MAP.
+---@return string|nil raidbotsInstanceId
 local function GetCurrentDungeonId()
     if not DroprDB.dungeons then return nil end
-    local _, _, _, _, _, _, _, instanceId = GetInstanceInfo()
-    if not instanceId or instanceId == 0 then return nil end
-    local key = tostring(instanceId)
+    local _, _, _, _, _, _, _, wowInstanceId = GetInstanceInfo()
+    if not wowInstanceId or wowInstanceId == 0 then return nil end
+
+    -- Translate WoW instanceID → Raidbots instanceId key
+    local key = DROPR_INSTANCE_MAP[wowInstanceId]
+    -- Fallback: try raw tostring in case it was stored directly (future-proof)
+    if not key then key = tostring(wowInstanceId) end
+
     if DroprDB.dungeons[key] then
         return key
     end
@@ -194,7 +222,21 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
             CheckStale()
         end
 
-    elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- Defer by one frame — GetInstanceInfo() may return 0 immediately on
+        -- login/reload even when the player is already inside a dungeon.
+        C_Timer.After(0, function()
+            local dungeonId = GetCurrentDungeonId()
+            if _G.DroprUI then
+                if dungeonId then
+                    _G.DroprUI.ShowDungeon(dungeonId)
+                else
+                    _G.DroprUI.Hide()
+                end
+            end
+        end)
+
+    elseif event == "ZONE_CHANGED_NEW_AREA" then
         local dungeonId = GetCurrentDungeonId()
         if _G.DroprUI then
             if dungeonId then
@@ -253,10 +295,15 @@ SlashCmdList["DROPR"] = function(msg)
             if dungeonId then
                 _G.DroprUI.ShowDungeon(dungeonId)
             else
-                -- Show first dungeon as a fallback when not in-instance
-                local firstId
-                for k in pairs(DroprDB.dungeons) do firstId = k; break end
-                if firstId then _G.DroprUI.ShowDungeon(firstId) end
+                -- Fallback: show dungeon with highest top-item dpsGain
+                local bestId, bestGain
+                for k, v in pairs(DroprDB.dungeons) do
+                    local gain = v.items and v.items[1] and v.items[1].dpsGain or 0
+                    if not bestGain or gain > bestGain then
+                        bestId, bestGain = k, gain
+                    end
+                end
+                if bestId then _G.DroprUI.ShowDungeon(bestId) end
             end
         end
 
