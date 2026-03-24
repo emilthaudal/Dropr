@@ -254,8 +254,8 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
                     _G.DroprUI.Hide()
                 end
             end
-            -- Broadcast our data to any group members who also have Dropr
-            if _G.DroprSync then _G.DroprSync.Broadcast() end
+            -- Broadcast our data to any group members who also have Dropr (silent)
+            if _G.DroprSync then _G.DroprSync.Broadcast(true) end
         end)
 
     elseif event == "ZONE_CHANGED_NEW_AREA" then
@@ -267,7 +267,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
                 _G.DroprUI.Hide()
             end
         end
-        if _G.DroprSync then _G.DroprSync.Broadcast() end
+        if _G.DroprSync then _G.DroprSync.Broadcast(true) end  -- silent on zone change
     end
 end)
 

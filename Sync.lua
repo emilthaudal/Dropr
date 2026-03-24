@@ -54,9 +54,9 @@ end
 -- Broadcast
 -- ---------------------------------------------------------------------------
 
--- Broadcast our dungeon summary to the group.
--- Called on zone-in and GROUP_ROSTER_UPDATE (if we have data).
-function DroprSync.Broadcast()
+---Broadcast our dungeon summary to the group.
+---@param silent boolean? If true, suppresses the chat confirmation message.
+function DroprSync.Broadcast(silent)
     local channel = GetChannel()
     if not channel then return end                    -- not in a group
     if not DroprDB or not DroprDB.dungeons then return end  -- no data to send
@@ -90,6 +90,9 @@ function DroprSync.Broadcast()
     end
 
     C_ChatInfo.SendAddonMessage(SYNC_PREFIX, payload, channel)
+    if not silent then
+        DroprPrint("Synced your droptimizer data to the group.")
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -129,6 +132,8 @@ local function OnAddonMessage(_, prefix, message, _, sender)
         dungeons   = dungeons,
         receivedAt = time(),
     }
+
+    DroprPrint(string.format("Received sync data from %s.", charName))
 
     -- Refresh the main GUI if it's open
     if _G.DroprUI and _G.DroprUI.RefreshMain then
@@ -249,8 +254,8 @@ syncFrame:SetScript("OnEvent", function(_, event, ...)
 
     elseif event == "GROUP_ROSTER_UPDATE" then
         PruneSyncData()
-        -- Re-broadcast our own data so new members get it
-        DroprSync.Broadcast()
+        -- Re-broadcast our own data so new members get it (silent — automatic)
+        DroprSync.Broadcast(true)
         -- Refresh UI if open
         if _G.DroprUI and _G.DroprUI.RefreshMain then
             _G.DroprUI.RefreshMain()
