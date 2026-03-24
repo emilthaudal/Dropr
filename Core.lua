@@ -1,7 +1,8 @@
 -- Dropr — Core.lua
 -- Import parsing, slash commands, event registration
 
-local json = _G.json  -- rxi/json.lua exposes a global `json` table
+-- NOTE: _G.json is NOT captured at load time — rxi/json.lua may not be
+-- registered yet. Always look it up lazily inside functions that need it.
 
 -- ---------------------------------------------------------------------------
 -- Base64 decode (WoW has no native base64; minimal RFC4648 implementation)
@@ -41,6 +42,12 @@ end
 local function ImportData(str)
     if not str or str == "" then
         DroprPrint("Usage: /dropr import <string>")
+        return
+    end
+
+    local json = _G.json
+    if not json then
+        DroprPrint("Import failed: json library not loaded.")
         return
     end
 
@@ -209,7 +216,13 @@ SlashCmdList["DROPR"] = function(msg)
     local cmd, rest = msg:match("^(%S+)%s*(.*)")
     cmd = cmd and cmd:lower() or ""
 
-    if cmd == "import" then
+    if cmd == "" then
+        -- No subcommand: open the main GUI
+        if _G.DroprUI and _G.DroprUI.OpenMain then
+            _G.DroprUI.OpenMain()
+        end
+
+    elseif cmd == "import" then
         if rest and rest ~= "" then
             -- Direct inline import (scripting / macro use)
             ImportData(rest)
@@ -249,8 +262,9 @@ SlashCmdList["DROPR"] = function(msg)
 
     else
         DroprPrint("Commands:")
-        DroprPrint("  /dropr import           — Open import window (paste string there)")
-        DroprPrint("  /dropr show             — Show the reminder frame")
+        DroprPrint("  /dropr                  — Open main GUI")
+        DroprPrint("  /dropr import           — Open import window")
+        DroprPrint("  /dropr show             — Show the zone reminder frame")
         DroprPrint("  /dropr clear            — Clear imported data")
         DroprPrint("Tip: Click the × button on any item row to remove it.")
     end
