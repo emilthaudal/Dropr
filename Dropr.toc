@@ -13,4 +13,5 @@ Libs/json.lua/json.lua
 
 Init.lua
 Core.lua
+Sync.lua
 UI.lua

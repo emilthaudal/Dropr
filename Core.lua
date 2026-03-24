@@ -109,6 +109,8 @@ local function ImportData(str)
     if _G.DroprUI and _G.DroprUI.Refresh then
         _G.DroprUI.Refresh()
     end
+    -- Broadcast updated data to group
+    if _G.DroprSync then _G.DroprSync.Broadcast() end
 end
 
 -- Expose ImportData as a global so UI.lua's Confirm button can call it
@@ -242,6 +244,8 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
                     _G.DroprUI.Hide()
                 end
             end
+            -- Broadcast our data to any group members who also have Dropr
+            if _G.DroprSync then _G.DroprSync.Broadcast() end
         end)
 
     elseif event == "ZONE_CHANGED_NEW_AREA" then
@@ -253,6 +257,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
                 _G.DroprUI.Hide()
             end
         end
+        if _G.DroprSync then _G.DroprSync.Broadcast() end
     end
 end)
 
@@ -315,12 +320,21 @@ SlashCmdList["DROPR"] = function(msg)
             end
         end
 
+    elseif cmd == "sync" then
+        if _G.DroprSync then
+            _G.DroprSync.Broadcast()
+            DroprPrint("Droptimizer data broadcast to group.")
+        else
+            DroprPrint("Sync module not loaded.")
+        end
+
     else
         DroprPrint("Commands:")
         DroprPrint("  /dropr                  — Open main GUI")
         DroprPrint("  /dropr import           — Open import window")
         DroprPrint("  /dropr show             — Show the zone reminder frame")
+        DroprPrint("  /dropr sync             — Broadcast your data to group")
         DroprPrint("  /dropr clear            — Clear imported data")
-        DroprPrint("Tip: Click the × button on any item row to remove it.")
+        DroprPrint("Tip: Click the [x] button on any item row to remove it.")
     end
 end

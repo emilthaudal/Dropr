@@ -15,6 +15,13 @@
 --       }
 --     },
 --   framePos   = table,        Saved mover position { point, x, y }
+--   mainPos    = table,        Saved main GUI mover position { point, x, y }
+--   syncData   = table,        Keyed by player short name (no realm)
+--     ["Jetskis"] = {
+--       char       = string,   Character name as reported by sender
+--       dungeons   = table,    { [dungeonId] = totalDpsGain }
+--       receivedAt = number,   Unix timestamp of last receipt
+--     },
 -- }
 
 DroprDB = DroprDB or {}

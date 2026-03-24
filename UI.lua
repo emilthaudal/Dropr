@@ -91,6 +91,13 @@ local mainPool = {
     dpsFs      = {},   -- AF.CreateFontString "lime"    (dps gain)
     btns       = {},   -- CreateFrame("Button") [x] buttons
     rowSeps    = {},   -- sc:CreateTexture separators
+    -- Group sync section pools
+    grpTitle   = {},   -- AF.CreateFontString "accent"  ("Group" heading)
+    grpTitleSep= {},   -- sc:CreateTexture heading underline
+    grpNames   = {},   -- AF.CreateFontString "white"   (dungeon name per group row)
+    grpAvgs    = {},   -- AF.CreateFontString "lime"    (avg dps gain)
+    grpPlayers = {},   -- AF.CreateFontString "gray"    (player list)
+    grpSeps    = {},   -- sc:CreateTexture row separators
 }
 
 -- ---------------------------------------------------------------------------
@@ -424,10 +431,130 @@ local function RefreshMainFrame()
     end
 
     local sc = mainFrame.scrollChild
-    -- Pool counters
+    local totalH  = 0
+    local ROW_W   = MAIN_W - 30 - PADDING * 2 - ICON_SIZE - BTN_SIZE - PADDING * 2 - 6
+    local DNAME_H = 24
+    local SECTION_GAP = 8
+
+    -- -----------------------------------------------------------------------
+    -- Group sync section (shown only when sync data is available)
+    -- -----------------------------------------------------------------------
+    local GRP_ROW_H = 36   -- height of each group dungeon row
+    local pGrpTitle  = 0
+    local pGrpTSep   = 0
+    local pGrpName   = 0
+    local pGrpAvg    = 0
+    local pGrpPlayer = 0
+    local pGrpSep    = 0
+
+    local groupSummary = (_G.DroprSync and _G.DroprSync.GetGroupSummary()) or {}
+
+    if #groupSummary > 0 then
+        -- Section heading: "Group"
+        pGrpTitle = pGrpTitle + 1
+        local grpHeading = PoolGet(mainPool.grpTitle, pGrpTitle, function()
+            return AF.CreateFontString(sc, "", "accent")
+        end)
+        grpHeading:ClearAllPoints()
+        grpHeading:SetPoint("TOPLEFT", sc, "TOPLEFT", PADDING, -(totalH + PADDING))
+        grpHeading:SetText("|cff00ccffGroup|r")
+        grpHeading:Show()
+        totalH = totalH + PADDING + DNAME_H
+
+        -- Thin separator under heading
+        pGrpTSep = pGrpTSep + 1
+        local grpHSep = PoolGet(mainPool.grpTitleSep, pGrpTSep, function()
+            local t = sc:CreateTexture(nil, "BACKGROUND")
+            t:SetHeight(1)
+            t:SetColorTexture(0.3, 0.3, 0.3, 0.6)
+            return t
+        end)
+        grpHSep:ClearAllPoints()
+        grpHSep:SetPoint("TOPLEFT",  sc, "TOPLEFT",  PADDING,  -totalH)
+        grpHSep:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -PADDING, -totalH)
+        grpHSep:Show()
+        totalH = totalH + 4
+
+        -- One row per dungeon in group summary
+        for _, entry in ipairs(groupSummary) do
+            local rowY = -(totalH)
+
+            -- Dungeon name
+            pGrpName = pGrpName + 1
+            local gname = PoolGet(mainPool.grpNames, pGrpName, function()
+                local f = AF.CreateFontString(sc, "", "white")
+                f:SetWidth(ROW_W + ICON_SIZE + 6 - 80)
+                f:SetWordWrap(false)
+                f:SetNonSpaceWrap(false)
+                return f
+            end)
+            gname:ClearAllPoints()
+            gname:SetPoint("TOPLEFT", sc, "TOPLEFT", PADDING, rowY - 6)
+            -- Look up dungeon name from personal data if available
+            local dungeonName = (DroprDB.dungeons and DroprDB.dungeons[entry.dungeonId] and
+                                 DroprDB.dungeons[entry.dungeonId].name) or entry.dungeonId
+            gname:SetText(dungeonName)
+            gname:Show()
+
+            -- Avg DPS gain (right side)
+            pGrpAvg = pGrpAvg + 1
+            local gavg = PoolGet(mainPool.grpAvgs, pGrpAvg, function()
+                return AF.CreateFontString(sc, "", "lime")
+            end)
+            gavg:ClearAllPoints()
+            gavg:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -PADDING, rowY - 6)
+            gavg:SetText("avg " .. FormatDpsGain(entry.avgGain))
+            gavg:Show()
+
+            -- Player list (small gray text below dungeon name)
+            pGrpPlayer = pGrpPlayer + 1
+            local gplayers = PoolGet(mainPool.grpPlayers, pGrpPlayer, function()
+                local f = AF.CreateFontString(sc, "", "gray")
+                f:SetWidth(ROW_W + ICON_SIZE + 6 - 80)
+                f:SetWordWrap(false)
+                return f
+            end)
+            gplayers:ClearAllPoints()
+            gplayers:SetPoint("TOPLEFT", gname, "BOTTOMLEFT", 0, -2)
+            local playerStr = table.concat(entry.players or {}, ", ")
+            if #playerStr > 40 then playerStr = playerStr:sub(1, 37) .. "..." end
+            gplayers:SetText("|cffaaaaaa" .. entry.playerCount .. " player" ..
+                (entry.playerCount ~= 1 and "s" or "") .. ": " .. playerStr .. "|r")
+            gplayers:Show()
+
+            -- Row separator
+            pGrpSep = pGrpSep + 1
+            local gsep = PoolGet(mainPool.grpSeps, pGrpSep, function()
+                local t = sc:CreateTexture(nil, "BACKGROUND")
+                t:SetHeight(1)
+                t:SetColorTexture(0.25, 0.25, 0.25, 0.5)
+                return t
+            end)
+            gsep:ClearAllPoints()
+            gsep:SetPoint("TOPLEFT",  sc, "TOPLEFT",  PADDING,  rowY - GRP_ROW_H)
+            gsep:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -PADDING, rowY - GRP_ROW_H)
+            gsep:Show()
+
+            totalH = totalH + GRP_ROW_H
+        end
+
+        totalH = totalH + SECTION_GAP
+    end
+
+    -- Hide unused group pool slots
+    PoolHideFrom(mainPool.grpTitle,    pGrpTitle  + 1)
+    PoolHideFrom(mainPool.grpTitleSep, pGrpTSep   + 1)
+    PoolHideFrom(mainPool.grpNames,    pGrpName   + 1)
+    PoolHideFrom(mainPool.grpAvgs,     pGrpAvg    + 1)
+    PoolHideFrom(mainPool.grpPlayers,  pGrpPlayer + 1)
+    PoolHideFrom(mainPool.grpSeps,     pGrpSep    + 1)
+
+    -- -----------------------------------------------------------------------
+    -- Personal dungeon list
+    -- -----------------------------------------------------------------------
     local pDname  = 0
     local pCount  = 0
-    local pRowSep = 0  -- section-header separators (different from item row seps)
+    local rowIdx  = 0
 
     if not DroprDB.dungeons then
         PoolHideFrom(mainPool.dnames,  1)
@@ -444,10 +571,10 @@ local function RefreshMainFrame()
             return AF.CreateFontString(sc, "", "gray")
         end)
         empty:ClearAllPoints()
-        empty:SetPoint("TOPLEFT", sc, "TOPLEFT", PADDING, -PADDING)
+        empty:SetPoint("TOPLEFT", sc, "TOPLEFT", PADDING, -(totalH + PADDING))
         empty:SetText("No data. Click Import to get started.")
         empty:Show()
-        sc:SetHeight(60)
+        sc:SetHeight(totalH + 60)
         return
     end
 
@@ -462,14 +589,14 @@ local function RefreshMainFrame()
         return aTop > bTop
     end)
 
-    -- Width available for name/slot text: full row minus icon, [x] button, padding
-    local ROW_W   = MAIN_W - 30 - PADDING * 2 - ICON_SIZE - BTN_SIZE - PADDING * 2 - 6
-    local DNAME_H = 24
-    local SECTION_GAP = 8
-
-    -- Item row pool index (shared across all dungeons in this refresh)
-    local rowIdx  = 0
-    local totalH  = 0
+    local mainPoolSet = {
+        icons = mainPool.icons,
+        names = mainPool.nameFs,
+        slots = mainPool.slotFs,
+        dpss  = mainPool.dpsFs,
+        btns  = mainPool.btns,
+        seps  = mainPool.rowSeps,
+    }
 
     for _, entry in ipairs(sorted) do
         local dungeon  = entry.dungeon
@@ -498,24 +625,10 @@ local function RefreshMainFrame()
 
         totalH = totalH + PADDING + DNAME_H
 
-        -- Render each item row using the shared RenderRow function.
-        -- RenderRow uses per-pool-key sub-pools from mainPool; we pass a poolSet
-        -- that maps the generic keys (icons/names/slots/dpss/btns/seps) to mainPool's tables.
-        local mainPoolSet = {
-            icons = mainPool.icons,
-            names = mainPool.nameFs,
-            slots = mainPool.slotFs,
-            dpss  = mainPool.dpsFs,
-            btns  = mainPool.btns,
-            seps  = mainPool.rowSeps,
-        }
-
         for _, item in ipairs(items) do
             rowIdx = rowIdx + 1
             local rowY = -(totalH)
-            local row = RenderRow(mainPoolSet, rowIdx, sc, rowY, ROW_W, ICON_SIZE, MAIN_ITEM_H, item, entry.id)
-            -- RenderRow returns a row table but we don't need to cache it here;
-            -- the pool handles reuse.
+            RenderRow(mainPoolSet, rowIdx, sc, rowY, ROW_W, ICON_SIZE, MAIN_ITEM_H, item, entry.id)
             totalH = totalH + MAIN_ITEM_H
         end
 
@@ -649,4 +762,11 @@ function DroprUI.OpenMain()
 
     RefreshMainFrame()
     mainFrame:Show()
+end
+
+-- Called by Sync.lua when new group data arrives to live-update the open window.
+function DroprUI.RefreshMain()
+    if mainFrame and mainFrame:IsShown() then
+        RefreshMainFrame()
+    end
 end
