@@ -12,19 +12,22 @@
 -- ---------------------------------------------------------------------------
 
 DROPR_INSTANCE_MAP = {
-    -- Current M+ pool (Midnight Season 1)
+    -- Midnight Season 1 M+ pool
+    -- Legacy dungeons
     [2526] = "1201",  -- Algeth'ar Academy
     [658]  = "278",   -- Pit of Saron
     [1753] = "945",   -- Seat of the Triumvirate
     [1209] = "476",   -- Skyreach
-    -- New Midnight dungeons — WoW IDs TBD in-game; add as discovered:
-    -- [????] = "1299",  -- Windrunner Spire
-    -- [????] = "1300",  -- Magisters' Terrace
-    -- [????] = "1315",  -- Maisara Caverns
-    -- [????] = "1316",  -- Nexus-Point Xenas
-    -- [????] = "1311",  -- Den of Nalorakk
-    -- [????] = "1313",  -- Voidscar Arena
-    -- [????] = "1309",  -- The Blinding Vale
+    -- New Midnight dungeons (WoW IDs verified in-game; Raidbots IDs from report data)
+    [2805] = "1299",  -- Windrunner's Spire
+    [2811] = "1300",  -- Magisters' Terrace
+    [2874] = "1315",  -- Maisara Caverns
+    [2915] = "1316",  -- Nexus-Point Xenas
+    -- Remaining Midnight dungeons — Raidbots IDs not yet confirmed (no report seen):
+    -- [2825] = "????",  -- Den of Nalorakk
+    -- [2813] = "????",  -- Murder Row
+    -- [2859] = "????",  -- The Blinding Vale
+    -- [2923] = "????",  -- Voidscar Arena
 }
 
 -- ---------------------------------------------------------------------------
