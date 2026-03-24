@@ -316,11 +316,17 @@ local function EnsureImportFrame()
     confirmBtn:SetScript("OnClick", function()
         local str = scrollEB.eb:GetText()
         str = str:gsub("%s+", "")
-        if str ~= "" and _G.DroprImportData then
+        local didImport = str ~= "" and _G.DroprImportData ~= nil
+        if didImport then
             _G.DroprImportData(str)
         end
         scrollEB.eb:SetText("")
         importFrame:Hide()
+        -- Open the main window after a successful import so the user can
+        -- immediately see their freshly loaded dungeon data.
+        if didImport and DroprUI.OpenMain then
+            DroprUI.OpenMain()
+        end
     end)
 
     -- Cancel button
