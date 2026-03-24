@@ -1,5 +1,7 @@
 -- Dropr — Init.lua
--- SavedVariables schema and constants
+-- SavedVariablesPerCharacter schema and constants
+-- DroprDB is stored per-character (SavedVariablesPerCharacter in .toc).
+-- Each character gets its own independent wishlist.
 
 -- DroprDB schema:
 -- {
