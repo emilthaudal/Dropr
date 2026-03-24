@@ -24,7 +24,7 @@ local BTN_SIZE     = 22   -- [x] button width
 local IMPORT_W   = 440
 local IMPORT_H   = 220   -- body height (header is above this)
 
-local DROPR_SITE_URL = "https://dropr-loot.vercel.app/"
+local DROPR_SITE_URL = "https://dropr.thaudal.com/"
 
 local MAIN_W     = 480
 local MAIN_H     = 520   -- body height
