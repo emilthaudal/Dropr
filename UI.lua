@@ -17,6 +17,9 @@ local PADDING      = 10
 local ICON_SIZE    = 28
 local BTN_SIZE     = 16   -- × button
 
+local IMPORT_W     = 440
+local IMPORT_H     = 220
+
 local SLOT_LABELS = {
     head       = "Head",
     neck       = "Neck",
@@ -43,12 +46,17 @@ local SLOT_LABELS = {
 local DroprUI = {}
 _G.DroprUI = DroprUI
 
+-- Reminder frame state
 local frame
 local dungeonLabel
 local specLabel
 local contentFrame
 local activeRows = {}         -- currently displayed row widgets
 local currentInstanceId       -- track which dungeon is shown
+
+-- Import window state
+local importFrame
+local importEditBox
 
 -- ---------------------------------------------------------------------------
 -- Helpers
@@ -149,6 +157,92 @@ local function CreateRow(index, item, instanceId)
 end
 
 -- ---------------------------------------------------------------------------
+-- Import window
+-- ---------------------------------------------------------------------------
+
+local function EnsureImportFrame()
+    if importFrame then return end
+    if not AF then return end
+
+    importFrame = AF.CreateHeaderedFrame(
+        AF.UIParent, "DroprImportFrame",
+        "|cff00ccffDropr|r — Import",
+        IMPORT_W, IMPORT_H
+    )
+    importFrame:SetFrameLevel(300)
+    importFrame:SetTitleJustify("LEFT")
+    importFrame:Hide()
+    AF.SetPoint(importFrame, "CENTER")
+    AF.ApplyCombatProtectionToFrame(importFrame)
+
+    -- Instruction label
+    local hint = AF.CreateFontString(importFrame, "", "gray")
+    hint:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -8)
+    hint:SetPoint("RIGHT",   importFrame, "RIGHT",   -PADDING, 0)
+    hint:SetText("Paste your import string from dropr-web, then click Confirm.")
+
+    -- Scroll frame container for the edit box
+    local scrollBg = CreateFrame("Frame", nil, importFrame, "BackdropTemplate")
+    scrollBg:SetPoint("TOPLEFT",     importFrame, "TOPLEFT",     PADDING,  -(HEADER_H + 4))
+    scrollBg:SetPoint("BOTTOMRIGHT", importFrame, "BOTTOMRIGHT", -PADDING,  36)
+    scrollBg:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left=3, right=3, top=3, bottom=3 },
+    })
+    scrollBg:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
+    scrollBg:SetBackdropBorderColor(0.3, 0.3, 0.4, 0.8)
+
+    local scrollFrame = CreateFrame("ScrollFrame", nil, scrollBg, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT",     scrollBg, "TOPLEFT",     4,  -4)
+    scrollFrame:SetPoint("BOTTOMRIGHT", scrollBg, "BOTTOMRIGHT", -24, 4)
+
+    importEditBox = CreateFrame("EditBox", nil, scrollFrame)
+    importEditBox:SetMultiLine(true)
+    importEditBox:SetMaxLetters(0)        -- unlimited
+    importEditBox:SetAutoFocus(false)
+    importEditBox:SetFontObject(ChatFontNormal)
+    importEditBox:SetWidth(scrollFrame:GetWidth() or (IMPORT_W - PADDING * 2 - 28))
+    importEditBox:SetTextInsets(6, 6, 4, 4)
+    importEditBox:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+        importFrame:Hide()
+    end)
+    importEditBox:SetScript("OnTextChanged", function(self)
+        scrollFrame:UpdateScrollChildRect()
+    end)
+    -- Ctrl+A selects all so the user can easily replace existing text
+    importEditBox:SetScript("OnKeyDown", function(self, key)
+        if key == "A" and IsControlKeyDown() then
+            self:HighlightText()
+        end
+    end)
+    scrollFrame:SetScrollChild(importEditBox)
+
+    -- Confirm button
+    local confirmBtn = AF.CreateButton(importFrame, "Confirm", "green", 100, 24)
+    confirmBtn:SetPoint("BOTTOMRIGHT", importFrame, "BOTTOMRIGHT", -PADDING, 6)
+    confirmBtn:SetScript("OnClick", function()
+        local str = importEditBox:GetText()
+        str = str:gsub("%s+", "")   -- strip any accidental whitespace/newlines
+        if str ~= "" and _G.DroprImportData then
+            _G.DroprImportData(str)
+        end
+        importEditBox:SetText("")
+        importFrame:Hide()
+    end)
+
+    -- Cancel button
+    local cancelBtn = AF.CreateButton(importFrame, "Cancel", "red", 80, 24)
+    cancelBtn:SetPoint("RIGHT", confirmBtn, "LEFT", -6, 0)
+    cancelBtn:SetScript("OnClick", function()
+        importEditBox:SetText("")
+        importFrame:Hide()
+    end)
+end
+
+-- ---------------------------------------------------------------------------
 -- Frame bootstrap (deferred until AF is available)
 -- ---------------------------------------------------------------------------
 
@@ -244,4 +338,13 @@ function DroprUI.Refresh()
     if currentInstanceId then
         DroprUI.ShowDungeon(currentInstanceId)
     end
+end
+
+---Open the import string paste window.
+function DroprUI.OpenImport()
+    EnsureImportFrame()
+    if not importFrame then return end
+    importEditBox:SetText("")
+    importFrame:Show()
+    importEditBox:SetFocus()
 end

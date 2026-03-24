@@ -81,6 +81,9 @@ local function ImportData(str)
     end
 end
 
+-- Expose ImportData as a global so UI.lua's Confirm button can call it
+_G.DroprImportData = ImportData
+
 -- ---------------------------------------------------------------------------
 -- Remove item
 -- ---------------------------------------------------------------------------
@@ -207,7 +210,17 @@ SlashCmdList["DROPR"] = function(msg)
     cmd = cmd and cmd:lower() or ""
 
     if cmd == "import" then
-        ImportData(rest)
+        if rest and rest ~= "" then
+            -- Direct inline import (scripting / macro use)
+            ImportData(rest)
+        else
+            -- No argument: open the paste window
+            if _G.DroprUI and _G.DroprUI.OpenImport then
+                _G.DroprUI.OpenImport()
+            else
+                DroprPrint("UI not ready. Try again after fully loading.")
+            end
+        end
 
     elseif cmd == "clear" then
         DroprDB.importedAt = nil
@@ -236,7 +249,7 @@ SlashCmdList["DROPR"] = function(msg)
 
     else
         DroprPrint("Commands:")
-        DroprPrint("  /dropr import <string>  — Import droptimizer data")
+        DroprPrint("  /dropr import           — Open import window (paste string there)")
         DroprPrint("  /dropr show             — Show the reminder frame")
         DroprPrint("  /dropr clear            — Clear imported data")
         DroprPrint("Tip: Click the × button on any item row to remove it.")
