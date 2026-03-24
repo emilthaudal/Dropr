@@ -4,15 +4,15 @@
 -- group gain per dungeon.
 --
 -- Protocol (addon message, prefix "Dropr"):
---   DROPR_V1:<charName>|<id>:<totalGain>,<id>:<totalGain>,...
+--   DROPR_V1:<charName>|<id>:<bestGain>,<id>:<bestGain>,...
 --
--- "totalGain" is the sum of dpsGain for all items in that dungeon (a rough
--- proxy for how much the dungeon is worth to this player). Sorted descending
--- by the sender, but we re-sort on receipt.
+-- "bestGain" is the highest single-item dpsGain for that dungeon (since a
+-- player can only loot one item per dungeon, this is the realistic expected
+-- value). The group avg shown in the UI is the mean of each player's bestGain.
 --
 -- Channel: "PARTY" when in a regular party, "RAID" when in a raid.
--- Messages from self are ignored. Data from players who leave the group is
--- pruned on GROUP_ROSTER_UPDATE.
+-- Messages from self are ignored (realm-suffix-safe comparison).
+-- Data from players who leave the group is pruned on GROUP_ROSTER_UPDATE.
 
 local SYNC_PREFIX  = "Dropr"
 local SYNC_VERSION = "DROPR_V1"
@@ -61,17 +61,20 @@ function DroprSync.Broadcast()
     if not channel then return end                    -- not in a group
     if not DroprDB or not DroprDB.dungeons then return end  -- no data to send
 
-    -- Build compact payload: id:totalGain pairs
+    -- Build compact payload: id:bestGain pairs
+    -- bestGain = highest single-item dpsGain in that dungeon
+    -- (since you can only loot one item per dungeon, this is the expected value)
     local parts = {}
     for id, dungeon in pairs(DroprDB.dungeons) do
-        local total = 0
+        local best = 0
         if dungeon.items then
             for _, item in ipairs(dungeon.items) do
-                total = total + (item.dpsGain or 0)
+                local g = item.dpsGain or 0
+                if g > best then best = g end
             end
         end
-        if total > 0 then
-            parts[#parts + 1] = id .. ":" .. total
+        if best > 0 then
+            parts[#parts + 1] = id .. ":" .. best
         end
     end
 
@@ -96,11 +99,11 @@ end
 local function OnAddonMessage(_, prefix, message, _, sender)
     if prefix ~= SYNC_PREFIX then return end
 
-    -- Ignore our own messages
-    local selfName = UnitName("player")
-    if sender == selfName then return end
-    -- Strip realm suffix if present (cross-realm groups)
+    -- Strip realm suffix from both sender and self before comparing
+    -- (cross-realm groups append "-RealmName" to sender)
     local senderShort = sender:match("^([^%-]+)") or sender
+    local selfShort   = (UnitName("player") or ""):match("^([^%-]+)") or ""
+    if senderShort == selfShort then return end
 
     -- Parse: DROPR_V1:<charName>|<id>:<gain>,...
     local version, rest = message:match("^([^:]+):(.+)$")
@@ -147,34 +150,37 @@ local function PruneSyncData()
     end
 end
 
--- ---------------------------------------------------------------------------
 -- Public: get aggregated group summary
 -- Returns a list sorted by avgGain descending:
 --   { dungeonId, avgGain, playerCount, players[] }
 -- Only includes dungeons present in at least one group member's data.
+-- avgGain = average of each player's best single-item dpsGain for the dungeon.
 -- ---------------------------------------------------------------------------
 
 function DroprSync.GetGroupSummary()
     if not DroprDB or not DroprDB.syncData then return {} end
     if not next(DroprDB.syncData) then return {} end
 
-    -- Accumulate totals per dungeon across all senders
-    local totals   = {}   -- dungeonId → sum of gains
+    -- Accumulate best-item gains per dungeon across all players
+    local totals   = {}   -- dungeonId → sum of best gains
     local counts   = {}   -- dungeonId → number of players who have it
     local players  = {}   -- dungeonId → list of char names
 
-    -- Also include self if we have data
+    local selfChar  = DroprDB.char or UnitName("player") or "?"
+    local selfShort = selfChar:match("^([^%-]+)") or selfChar
+
+    -- Include self
     if DroprDB.dungeons then
-        local selfChar = DroprDB.char or UnitName("player") or "?"
         for id, dungeon in pairs(DroprDB.dungeons) do
-            local total = 0
+            local best = 0
             if dungeon.items then
                 for _, item in ipairs(dungeon.items) do
-                    total = total + (item.dpsGain or 0)
+                    local g = item.dpsGain or 0
+                    if g > best then best = g end
                 end
             end
-            if total > 0 then
-                totals[id]  = (totals[id]  or 0) + total
+            if best > 0 then
+                totals[id]  = (totals[id]  or 0) + best
                 counts[id]  = (counts[id]  or 0) + 1
                 players[id] = players[id] or {}
                 players[id][#players[id] + 1] = selfChar
@@ -182,12 +188,16 @@ function DroprSync.GetGroupSummary()
         end
     end
 
+    -- Include group members — skip anyone whose char name matches self (dedup)
     for _, entry in pairs(DroprDB.syncData) do
-        for id, gain in pairs(entry.dungeons) do
-            totals[id]  = (totals[id]  or 0) + gain
-            counts[id]  = (counts[id]  or 0) + 1
-            players[id] = players[id] or {}
-            players[id][#players[id] + 1] = entry.char or "?"
+        local entryShort = (entry.char or ""):match("^([^%-]+)") or (entry.char or "")
+        if entryShort ~= selfShort then
+            for id, gain in pairs(entry.dungeons) do
+                totals[id]  = (totals[id]  or 0) + gain
+                counts[id]  = (counts[id]  or 0) + 1
+                players[id] = players[id] or {}
+                players[id][#players[id] + 1] = entry.char or "?"
+            end
         end
     end
 
@@ -204,6 +214,23 @@ function DroprSync.GetGroupSummary()
     end
     table.sort(result, function(a, b) return a.avgGain > b.avgGain end)
 
+    return result
+end
+
+-- Public: returns a list of char names (excluding self) who have data for
+-- the given dungeonId in their syncData. Used by the zone reminder UI.
+function DroprSync.GetMembersForDungeon(dungeonId)
+    if not DroprDB or not DroprDB.syncData then return {} end
+    local selfChar  = DroprDB.char or UnitName("player") or "?"
+    local selfShort = selfChar:match("^([^%-]+)") or selfChar
+    local result = {}
+    for _, entry in pairs(DroprDB.syncData) do
+        local entryShort = (entry.char or ""):match("^([^%-]+)") or (entry.char or "")
+        if entryShort ~= selfShort and entry.dungeons and entry.dungeons[dungeonId] then
+            result[#result + 1] = entry.char or "?"
+        end
+    end
+    table.sort(result)
     return result
 end
 

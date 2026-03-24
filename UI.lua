@@ -74,6 +74,8 @@ local rowPool = {
     seps     = {},  -- contentFrame:CreateTexture separators
     btns     = {},  -- CreateFrame("Button") [x] buttons
 }
+-- Pool for the "Also: Player1, Player2" group footer in the zone reminder
+local reminderGroupPool = {}  -- AF.CreateFontString "gray"
 
 -- Import window
 local importFrame
@@ -737,21 +739,48 @@ function DroprUI.ShowDungeon(instanceId)
     -- Width for name/slot text: frame width minus icon, [x] button, padding
     local rowW = FRAME_WIDTH - ICON_SIZE - BTN_SIZE - PADDING * 4 - 6
 
-    local contentH = n * (ROW_HEIGHT + ROW_GAP) + PADDING
-    local totalH   = LABEL_H + contentH
-    frame:SetHeight(totalH)
-    contentFrame:SetHeight(contentH)
-
     for i = 1, n do
         local offsetY = -((i - 1) * (ROW_HEIGHT + ROW_GAP))
         activeRows[i] = RenderRow(rowPool, i, contentFrame, offsetY, rowW, ICON_SIZE, ROW_HEIGHT, items[i], instanceId)
     end
+
+    -- Group member footer: "Group: Player1, Player2" for members who have this dungeon
+    local groupMembers = (_G.DroprSync and _G.DroprSync.GetMembersForDungeon(instanceId)) or {}
+    local GROUP_FOOTER_H = 0
+    if #groupMembers > 0 then
+        GROUP_FOOTER_H = 20
+        local gf = PoolGet(reminderGroupPool, 1, function()
+            local f = AF.CreateFontString(contentFrame, "", "gray")
+            f:SetPoint("BOTTOMLEFT", contentFrame, "BOTTOMLEFT", PADDING, PADDING)
+            f:SetPoint("RIGHT", contentFrame, "RIGHT", -PADDING, 0)
+            f:SetWordWrap(false)
+            return f
+        end)
+        local names = table.concat(groupMembers, ", ")
+        if #names > 38 then names = names:sub(1, 35) .. "..." end
+        gf:SetText("|cffaaaaaaGroup: " .. names .. "|r")
+        gf:Show()
+    else
+        -- Hide the footer if present
+        if reminderGroupPool[1] then reminderGroupPool[1]:Hide() end
+    end
+
+    local contentH = n * (ROW_HEIGHT + ROW_GAP) + PADDING + GROUP_FOOTER_H
+    local totalH   = LABEL_H + contentH
+
+    -- Set height before Show() to avoid the one-frame layout glitch on first open
+    frame:SetHeight(totalH)
+    contentFrame:SetHeight(contentH)
 
     frame:Show()
 end
 
 function DroprUI.Hide()
     if frame then frame:Hide() end
+end
+
+function DroprUI.IsReminderShown()
+    return frame ~= nil and frame:IsShown()
 end
 
 function DroprUI.Refresh()

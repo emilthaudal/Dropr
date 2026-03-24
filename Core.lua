@@ -147,12 +147,22 @@ function DroprRemoveItem(instanceId, itemId)
 
     DroprPrint(string.format("Removed %s from %s.", removedName, dungeon.name or instanceId))
 
-    -- Refresh UI
+    -- Refresh UI:
+    -- Only update the zone reminder if it is currently visible (i.e. removal
+    -- was triggered from the reminder frame itself). If the main GUI triggered
+    -- the removal, only refresh the main GUI to avoid popping open the reminder.
     if _G.DroprUI then
-        if DroprDB.dungeons and DroprDB.dungeons[instanceId] then
-            _G.DroprUI.ShowDungeon(instanceId)
-        else
-            _G.DroprUI.Hide()
+        local reminderVisible = _G.DroprUI.IsReminderShown and _G.DroprUI.IsReminderShown()
+        if reminderVisible then
+            if DroprDB.dungeons and DroprDB.dungeons[instanceId] then
+                _G.DroprUI.ShowDungeon(instanceId)
+            else
+                _G.DroprUI.Hide()
+            end
+        end
+        -- Always refresh the main GUI if it's open
+        if _G.DroprUI.RefreshMain then
+            _G.DroprUI.RefreshMain()
         end
     end
 end
