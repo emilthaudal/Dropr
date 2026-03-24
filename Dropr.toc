@@ -2,11 +2,11 @@
 ## Title: Dropr
 ## Notes: Shows your Raidbots droptimizer top items when entering an M+ dungeon
 ## Author: Jetskis
-## Version: 1.0.0
+## Version: 0.1.1
 ## SavedVariables: DroprDB
 ## Dependencies: AbstractFramework
-## X-Curse-Project-ID:
-## X-Wago-ID:
+## X-Curse-Project-ID: 1494551
+## X-Wago-ID: E6gv3LN1
 
 # Libraries (embedded by packager)
 Libs/json.lua/json.lua

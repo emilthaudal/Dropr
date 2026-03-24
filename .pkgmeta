@@ -1,1 +1,6 @@
 package-as: Dropr
+
+enable-nolib-creation: no
+
+embedded-libraries:
+  - Libs/json.lua
