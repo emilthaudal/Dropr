@@ -1,13 +1,9 @@
 package-as: Dropr
 
 externals:
-  Libs/AbstractFramework:
-    url: https://github.com/enderneko/AbstractFramework
-    tag: latest
   Libs/json.lua:
     url: https://github.com/rxi/json.lua
     tag: latest
 
 embedded-libraries:
-  - AbstractFramework
   - json.lua

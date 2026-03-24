@@ -9,8 +9,8 @@
 --   dungeons   = table,        Keyed by instanceId (string)
 --     ["1315"] = {
 --       name  = string,        Dungeon display name
---       items = {              Top 3 items by DPS gain
---         { id, name, slot, dpsGain, boss, icon },
+--       items = {              All items with >=100 DPS gain, sorted by dpsGain desc
+--         { id, name, slot, ilvl, dpsGain, boss, icon, isCatalyst },
 --         ...
 --       }
 --     },

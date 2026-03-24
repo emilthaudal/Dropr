@@ -109,14 +109,21 @@ local function CreateRow(index, item, instanceId)
         self:SetText("|cffff4444×|r")
     end)
 
-    -- Item name (between icon and button)
+    -- Item name + ilvl (between icon and button)
     local nameWidth = FRAME_WIDTH - ICON_SIZE - BTN_SIZE - PADDING * 4
+    local nameStr = item.name or "Unknown"
+    if item.ilvl and item.ilvl > 0 then
+        nameStr = nameStr .. " |cffaaaaaa(" .. item.ilvl .. ")|r"
+    end
+    if item.isCatalyst then
+        nameStr = nameStr .. " |cffffaa00[C]|r"
+    end
     row.nameText = AF.CreateFontString(contentFrame, "", "white")
     row.nameText:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 6, -2)
     row.nameText:SetWidth(nameWidth)
     row.nameText:SetWordWrap(false)
     row.nameText:SetNonSpaceWrap(false)
-    row.nameText:SetText(item.name or "Unknown")
+    row.nameText:SetText(nameStr)
 
     -- Slot · Boss (second line)
     row.slotText = AF.CreateFontString(contentFrame, "", "gray")

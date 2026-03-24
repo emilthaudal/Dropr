@@ -4,12 +4,11 @@
 ## Author: Jetskis
 ## Version: 1.0.0
 ## SavedVariables: DroprDB
-## OptionalDeps: AbstractFramework
+## Dependencies: AbstractFramework
 ## X-Curse-Project-ID:
 ## X-Wago-ID:
 
 # Libraries (embedded by packager)
-Libs/AbstractFramework/AbstractFramework.toc
 Libs/json.lua/json.lua
 
 Init.lua
