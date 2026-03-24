@@ -22,7 +22,9 @@ local BTN_SIZE     = 22   -- [x] button width
 -- Use PADDING offset from TOPLEFT for content spacing.
 
 local IMPORT_W   = 440
-local IMPORT_H   = 190   -- body height (header is above this)
+local IMPORT_H   = 220   -- body height (header is above this)
+
+local DROPR_SITE_URL = "https://dropr-loot.vercel.app/"
 
 local MAIN_W     = 480
 local MAIN_H     = 520   -- body height
@@ -276,16 +278,33 @@ local function EnsureImportFrame()
     AF.SetPoint(importFrame, "CENTER")
     AF.ApplyCombatProtectionToFrame(importFrame)
 
+    -- Site URL label + copyable edit box
+    local urlLabel = AF.CreateFontString(importFrame, "", "gray")
+    urlLabel:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -PADDING)
+    urlLabel:SetText("Get your import string at:")
+
+    local urlBox = CreateFrame("EditBox", nil, importFrame, "InputBoxTemplate")
+    urlBox:SetHeight(22)
+    urlBox:SetPoint("TOPLEFT",  importFrame, "TOPLEFT",  PADDING + 2, -PADDING - 18)
+    urlBox:SetPoint("TOPRIGHT", importFrame, "TOPRIGHT", -PADDING - 2, -PADDING - 18)
+    urlBox:SetText(DROPR_SITE_URL)
+    urlBox:SetAutoFocus(false)
+    urlBox:SetScript("OnEditFocusGained", function(self)
+        self:HighlightText()
+    end)
+    urlBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    urlBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
     -- Instruction label
     local hint = AF.CreateFontString(importFrame, "", "gray")
-    hint:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -PADDING)
+    hint:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -PADDING - 46)
     hint:SetPoint("RIGHT",   importFrame, "RIGHT",   -PADDING, 0)
-    hint:SetText("Paste your import string from dropr-web, then click Confirm.")
+    hint:SetText("Paste your import string below, then click Confirm.")
 
     -- Scrollable edit box
-    local ebH = IMPORT_H - 32 - 34 - PADDING
+    local ebH = IMPORT_H - 32 - 34 - 46 - PADDING
     local scrollEB = AF.CreateScrollEditBox(importFrame, nil, nil, IMPORT_W - PADDING * 2, ebH)
-    scrollEB:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -32)
+    scrollEB:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -32 - 46)
     scrollEB:SetPoint("RIGHT",   importFrame, "RIGHT",   -PADDING, 0)
     importEditBox = scrollEB
 
