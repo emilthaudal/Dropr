@@ -246,7 +246,7 @@ end
 local syncFrame = CreateFrame("Frame")
 syncFrame:RegisterEvent("CHAT_MSG_ADDON")
 syncFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
--- PLAYER_ENTERING_WORLD broadcast is triggered from Core.lua via DroprSync.Broadcast()
+syncFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 syncFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "CHAT_MSG_ADDON" then
@@ -260,6 +260,23 @@ syncFrame:SetScript("OnEvent", function(_, event, ...)
         if _G.DroprUI and _G.DroprUI.RefreshMain then
             _G.DroprUI.RefreshMain()
         end
+
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- On login/reload, if the player is not in a group, clear all stale
+        -- sync data. GROUP_ROSTER_UPDATE may not fire in this case, so we
+        -- prune here to avoid showing old group members from a previous session.
+        C_Timer.After(0, function()
+            if not IsInAnyGroup() then
+                if DroprDB then
+                    DroprDB.syncData = nil
+                end
+            else
+                PruneSyncData()
+            end
+            if _G.DroprUI and _G.DroprUI.RefreshMain then
+                _G.DroprUI.RefreshMain()
+            end
+        end)
     end
 end)
 
