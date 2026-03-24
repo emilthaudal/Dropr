@@ -1,0 +1,17 @@
+## Interface: 120000
+## Title: Dropr
+## Notes: Shows your Raidbots droptimizer top items when entering an M+ dungeon
+## Author: Jetskis
+## Version: 1.0.0
+## SavedVariables: DroprDB
+## OptionalDeps: AbstractFramework
+## X-Curse-Project-ID:
+## X-Wago-ID:
+
+# Libraries (embedded by packager)
+Libs/AbstractFramework/AbstractFramework.toc
+Libs/json.lua/json.lua
+
+Init.lua
+Core.lua
+UI.lua

@@ -1,6 +1,116 @@
-# Agent Instructions
+# AGENTS.md — Dropr Coding Agent Guide
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+
+---
+
+## Project Overview
+
+**Dropr** is a World of Warcraft addon written in **Lua 5.1** targeting Interface `120000`
+(The War Within / early Midnight). It displays your Raidbots droptimizer top-3 item
+recommendations automatically when you zone into an M+ dungeon.
+
+**Companion web tool:** `dropr-web` (separate repo) — a Next.js app that fetches a
+Raidbots droptimizer report and generates a base64-encoded JSON import string for this addon.
+
+---
+
+## Architecture
+
+```
+Init.lua    — DroprDB SavedVariables schema, constants, DroprPrint helper
+Core.lua    — Slash commands (/dropr import|clear|show), base64+JSON import decode,
+              ADDON_LOADED/PLAYER_ENTERING_WORLD/ZONE_CHANGED_NEW_AREA event handling,
+              stale data check (fires AF.ShowNotificationPopup if > DROPR_OUTDATED_DAYS old)
+UI.lua      — AbstractFramework frame: AF.CreateHeaderedFrame + 3 item rows + AF.CreateMover
+Libs/       — Empty at commit time; BigWigs packager fetches externals at release:
+                AbstractFramework (github.com/enderneko/AbstractFramework)
+                json.lua (github.com/rxi/json.lua)
+```
+
+---
+
+## Import String Format
+
+The web tool produces: `btoa(JSON.stringify(payload))` where payload is:
+
+```json
+{
+  "char": "Jetskis",
+  "spec": "unholy",
+  "importedAt": 1234567890,
+  "dungeons": {
+    "1315": {
+      "name": "Maisara Caverns",
+      "items": [
+        { "id": 251168, "name": "Liferipper's Cutlass", "slot": "main_hand",
+          "dpsGain": 2788, "boss": "Rak'tul, Vessel of Souls", "icon": "inv_..." }
+      ]
+    }
+  }
+}
+```
+
+In Core.lua: base64-decode the string → `json.decode()` (rxi/json.lua) → write to `DroprDB`.
+
+---
+
+## Build & Release
+
+There is **no local build step**. The release pipeline is fully CI-driven:
+
+- Releases are triggered by pushing a git tag (any tag pattern `**`)
+- `.github/workflows/release.yml` runs `BigWigsMods/packager@v2`
+- The packager fetches externals declared in `.pkgmeta`, zips the addon, and publishes
+  to CurseForge, Wago.io, and GitHub Releases
+
+To cut a release: `git tag v1.0.0 && git push origin v1.0.0`
+
+---
+
+## Testing
+
+**No automated test framework.** WoW addon testing is done live in-game.
+
+Workflow:
+1. Copy the Dropr folder to `<WoW>/Interface/AddOns/Dropr/` (or symlink it)
+2. Manually copy AbstractFramework and json.lua into `Libs/` for local dev
+3. In-game: `/reload` to reload all addon code
+4. Use `print(...)` or `DEFAULT_CHAT_FRAME:AddMessage(...)` for debug output
+5. Lua errors appear as in-game error dialogs with stack traces
+
+---
+
+## WoW Lua Constraints
+
+- **No HTTP requests** — WoW Lua sandbox has zero networking capability
+- **No `require`** — all files loaded sequentially by WoW client per `.toc` order
+- **No standard Lua libs** — `io`, `os`, `package`, `debug`, `utf8` do not exist
+- **Lua 5.1** — no `goto`, no integer division `//`, no bitwise operators (use `bit` lib)
+- **No `error()` or `assert()`** — these cause disruptive in-game error dialogs; use guards + `pcall`
+- **AbstractFramework** — access via `_G.AbstractFramework` (global set by the library)
+- **json.lua** — access via `_G.json` (global set by rxi/json.lua)
+
+---
+
+## Naming Conventions
+
+| Construct               | Convention        | Example                          |
+| ----------------------- | ----------------- | -------------------------------- |
+| Globals / SavedVars     | `PascalCase`      | `DroprDB`, `DroprUI`             |
+| Constants               | `UPPER_SNAKE_CASE`| `DROPR_OUTDATED_DAYS`            |
+| Local functions         | `PascalCase`      | `CreateItemRow()`, `CheckStale()`|
+| Local variables         | `camelCase`       | `dungeonId`, `itemRows`          |
+| WoW frame locals        | `PascalCase`      | `Frame`, `DungeonLabel`          |
+
+---
+
+## Error Handling
+
+- Guard all event handlers with nil checks at the top
+- Use `pcall` for any WoW API call that may fail
+- Never use `error()` or `assert()` — prefer silent/graceful failure
+- Use `DroprPrint(msg)` for user-facing non-fatal warnings
 
 ## Quick Reference
 

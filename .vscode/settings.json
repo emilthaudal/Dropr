@@ -1,0 +1,36 @@
+{
+    "Lua.runtime.version": "Lua 5.1",
+    "Lua.diagnostics.globals": [
+        "UIParent",
+        "SlashCmdList",
+        "SLASH_DROPR1",
+        "C_Map",
+        "C_Timer",
+        "CreateFrame",
+        "GetTime",
+        "date",
+        "hooksecurefunc",
+        "EJ_GetCurrentInstance",
+        "GetInstanceInfo",
+        "print",
+        "DEFAULT_CHAT_FRAME",
+        "pcall",
+        "time"
+    ],
+    "Lua.runtime.builtin": {
+        "basic": "disable",
+        "debug": "disable",
+        "io": "disable",
+        "math": "disable",
+        "os": "disable",
+        "package": "disable",
+        "string": "disable",
+        "table": "disable",
+        "utf8": "disable"
+    },
+    "Lua.workspace.library": [
+        "~/.vscode/extensions/ketho.wow-api-0.22.3/Annotations/Core",
+        "${env:AF_HOME}"
+    ],
+    "Lua.type.weakUnionCheck": true
+}
