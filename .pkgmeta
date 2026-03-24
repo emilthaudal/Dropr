@@ -1,3 +1,6 @@
 package-as: Dropr
 
 enable-nolib-creation: no
+
+required-dependencies:
+  - abstract-framework
