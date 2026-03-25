@@ -14,12 +14,17 @@
 -- Messages from self are ignored (realm-suffix-safe comparison).
 -- Data from players who leave the group is pruned on GROUP_ROSTER_UPDATE.
 
-local SYNC_PREFIX  = "Dropr"
-local SYNC_VERSION = "DROPR_V1"
+local SYNC_PREFIX    = "Dropr"
+local SYNC_VERSION   = "DROPR_V1"
+local BROADCAST_COOLDOWN = 5  -- seconds; collapses rapid GROUP_ROSTER_UPDATE bursts
 
 -- DroprSync is the public API table read by UI.lua.
 local DroprSync = {}
 _G.DroprSync = DroprSync
+
+-- Debounce state for GROUP_ROSTER_UPDATE broadcasts
+local broadcastPending = false
+local lastBroadcastTime = 0
 
 -- ---------------------------------------------------------------------------
 -- Helpers
@@ -133,8 +138,6 @@ local function OnAddonMessage(_, prefix, message, _, sender)
         receivedAt = time(),
     }
 
-    DroprPrint(string.format("Received sync data from %s.", charName))
-
     -- Refresh the main GUI if it's open
     if _G.DroprUI and _G.DroprUI.RefreshMain then
         _G.DroprUI.RefreshMain()
@@ -240,6 +243,27 @@ function DroprSync.GetMembersForDungeon(dungeonId)
 end
 
 -- ---------------------------------------------------------------------------
+-- Debounced broadcast: collapses rapid GROUP_ROSTER_UPDATE bursts into one
+-- send. If a broadcast was sent recently, schedule one deferred send instead
+-- of firing immediately.
+-- ---------------------------------------------------------------------------
+
+local function ScheduleBroadcast()
+    if broadcastPending then return end  -- already queued
+
+    local now = GetTime()
+    local elapsed = now - lastBroadcastTime
+    local delay = (elapsed >= BROADCAST_COOLDOWN) and 0 or (BROADCAST_COOLDOWN - elapsed)
+
+    broadcastPending = true
+    C_Timer.After(delay, function()
+        broadcastPending = false
+        lastBroadcastTime = GetTime()
+        DroprSync.Broadcast(true)  -- always silent for automatic syncs
+    end)
+end
+
+-- ---------------------------------------------------------------------------
 -- Event frame
 -- ---------------------------------------------------------------------------
 
@@ -254,8 +278,9 @@ syncFrame:SetScript("OnEvent", function(_, event, ...)
 
     elseif event == "GROUP_ROSTER_UPDATE" then
         PruneSyncData()
-        -- Re-broadcast our own data so new members get it (silent — automatic)
-        DroprSync.Broadcast(true)
+        -- Re-broadcast our own data so new members get it.
+        -- Use debounced helper to avoid spamming during rapid group assembly.
+        ScheduleBroadcast()
         -- Refresh UI if open
         if _G.DroprUI and _G.DroprUI.RefreshMain then
             _G.DroprUI.RefreshMain()
