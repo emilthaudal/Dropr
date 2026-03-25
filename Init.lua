@@ -28,6 +28,23 @@
 
 DroprDB = DroprDB or {}
 
+-- Static dungeon name lookup keyed by Raidbots instanceId (string).
+-- Used as a fallback when a dungeon appears in the group sync summary but
+-- the local player has no personal import data for it (so DroprDB.dungeons
+-- won't have a name for it). Keep in sync with DROPR_INSTANCE_MAP in Core.lua.
+DROPR_DUNGEON_NAMES = {
+    -- Legacy dungeons (Midnight S1 pool)
+    ["278"]  = "Pit of Saron",
+    ["476"]  = "Skyreach",
+    ["945"]  = "Seat of the Triumvirate",
+    ["1201"] = "Algeth'ar Academy",
+    -- Midnight dungeons
+    ["1299"] = "Windrunner's Spire",
+    ["1300"] = "Magisters' Terrace",
+    ["1315"] = "Maisara Caverns",
+    ["1316"] = "Nexus-Point Xenas",
+}
+
 DROPR_OUTDATED_DAYS = 7
 
 DROPR_ADDON_NAME = "Dropr"

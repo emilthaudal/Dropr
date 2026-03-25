@@ -517,9 +517,11 @@ local function RefreshMainFrame()
             end)
             gname:ClearAllPoints()
             gname:SetPoint("TOPLEFT", sc, "TOPLEFT", PADDING, rowY - 6)
-            -- Look up dungeon name from personal data if available
+            -- Look up dungeon name: personal data first, then static table, then raw ID
             local dungeonName = (DroprDB.dungeons and DroprDB.dungeons[entry.dungeonId] and
-                                 DroprDB.dungeons[entry.dungeonId].name) or entry.dungeonId
+                                 DroprDB.dungeons[entry.dungeonId].name)
+                                 or (DROPR_DUNGEON_NAMES and DROPR_DUNGEON_NAMES[entry.dungeonId])
+                                 or entry.dungeonId
             gname:SetText(dungeonName)
             gname:Show()
 
