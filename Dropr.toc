@@ -4,14 +4,11 @@
 ## Author: Jetskis
 ## Version: 0.1.8
 ## SavedVariablesPerCharacter: DroprDB
-## Dependencies: AbstractFramework
-## X-Curse-Project-ID: 1494551
-## X-Wago-ID: E6gv3LN1
-
 # Libraries (embedded by packager)
 Libs/json.lua/json.lua
 
 Init.lua
 Core.lua
 Sync.lua
+UIHelpers.lua
 UI.lua

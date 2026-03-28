@@ -179,20 +179,8 @@ local function CheckStale()
     local ageSeconds = time() - DroprDB.importedAt
     local ageDays = math.floor(ageSeconds / 86400)
     if ageDays >= DROPR_OUTDATED_DAYS then
-        -- Defer to next frame so AF is fully ready
         C_Timer.After(3, function()
-            if _G.AbstractFramework and _G.AbstractFramework.ShowNotificationPopup then
-                local AF = _G.AbstractFramework
-                AF.ShowNotificationPopup(
-                    string.format(
-                        "|cff00ccffDropr|r: Droptimizer data is |cffff4444%d day(s) old|r.\nRe-import from the web tool for fresh recommendations.",
-                        ageDays
-                    ),
-                    12
-                )
-            else
-                DroprPrint(string.format("Your droptimizer data is %d day(s) old. Consider re-importing.", ageDays))
-            end
+            DroprPrint(string.format("Your droptimizer data is %d day(s) old. Consider re-importing.", ageDays))
         end)
     end
 end

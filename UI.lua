@@ -1,8 +1,8 @@
 -- Dropr — UI.lua
--- AbstractFramework-based UI: zone reminder frame, import window, main GUI
+-- Native WoW UI: zone reminder frame, import window, main GUI
+-- Uses DroprUIH (UIHelpers.lua) — no AbstractFramework dependency.
 
----@type AbstractFramework
-local AF = _G.AbstractFramework
+local UIH = _G.DroprUIH
 
 -- ---------------------------------------------------------------------------
 -- Constants
@@ -16,19 +16,23 @@ local PADDING      = 10
 local ICON_SIZE    = 28
 local BTN_SIZE     = 22   -- [x] button width
 
--- NOTE on AF.CreateHeaderedFrame layout:
--- The header (20px) is anchored ABOVE the frame body, not inside it.
--- So f:TOPLEFT is the true top of the content area.
--- Use PADDING offset from TOPLEFT for content spacing.
+-- NOTE on UIH.CreateStyledFrame layout:
+-- The header (24px) is anchored INSIDE the frame body at the top (offset -2 for stripe).
+-- Content should be placed with a top offset that clears the header:
+--   TOPLEFT offset y = -(HEADER_H + STRIPE_H + PADDING) where HEADER_H=24, STRIPE_H=2
+-- We use PADDING (10) below the header; callers must offset by ~36px from frame TOPLEFT.
 
 local IMPORT_W   = 440
-local IMPORT_H   = 220   -- body height (header is above this)
+local IMPORT_H   = 220   -- body height
 
 local DROPR_SITE_URL = "https://dropr.thaudal.com/"
 
 local MAIN_W     = 480
 local MAIN_H     = 520   -- body height
 local MAIN_ITEM_H = 44   -- item row height in main GUI scroll view
+
+-- Height consumed by header + stripe inside the frame body
+local INNER_TOP  = 28    -- 2px stripe + 24px header + 2px gap
 
 local SLOT_LABELS = {
     head       = "Head",
@@ -68,14 +72,14 @@ local currentInstanceId
 -- WoW cannot destroy font strings or textures once created; we reuse them instead.
 local rowPool = {
     icons    = {},  -- contentFrame:CreateTexture objects
-    names    = {},  -- AF.CreateFontString "white"
-    slots    = {},  -- AF.CreateFontString "gray"
-    dpss     = {},  -- AF.CreateFontString "lime"
+    names    = {},  -- UIH.CreateFontString "white"
+    slots    = {},  -- UIH.CreateFontString "gray"
+    dpss     = {},  -- UIH.CreateFontString "lime"
     seps     = {},  -- contentFrame:CreateTexture separators
     btns     = {},  -- CreateFrame("Button") [x] buttons
 }
 -- Pool for the "Also: Player1, Player2" group footer in the zone reminder
-local reminderGroupPool = {}  -- AF.CreateFontString "gray"
+local reminderGroupPool = {}  -- UIH.CreateFontString "gray"
 
 -- Import window
 local importFrame
@@ -87,20 +91,20 @@ local mainFrame
 -- Main GUI scroll child: grow-only pools (same reason as zone reminder pools)
 -- Populated lazily in RefreshMainFrame.
 local mainPool = {
-    dnames     = {},   -- AF.CreateFontString "accent"  (dungeon headers)
-    counts     = {},   -- AF.CreateFontString "gray"    (item count labels)
+    dnames     = {},   -- UIH.CreateFontString "accent"  (dungeon headers)
+    counts     = {},   -- UIH.CreateFontString "gray"    (item count labels)
     icons      = {},   -- sc:CreateTexture
-    nameFs     = {},   -- AF.CreateFontString "white"   (item names)
-    slotFs     = {},   -- AF.CreateFontString "gray"    (slot · boss)
-    dpsFs      = {},   -- AF.CreateFontString "lime"    (dps gain)
+    nameFs     = {},   -- UIH.CreateFontString "white"   (item names)
+    slotFs     = {},   -- UIH.CreateFontString "gray"    (slot · boss)
+    dpsFs      = {},   -- UIH.CreateFontString "lime"    (dps gain)
     btns       = {},   -- CreateFrame("Button") [x] buttons
     rowSeps    = {},   -- sc:CreateTexture separators
     -- Group sync section pools
-    grpTitle   = {},   -- AF.CreateFontString "accent"  ("Group" heading)
+    grpTitle   = {},   -- UIH.CreateFontString "accent"  ("Group" heading)
     grpTitleSep= {},   -- sc:CreateTexture heading underline
-    grpNames   = {},   -- AF.CreateFontString "white"   (dungeon name per group row)
-    grpAvgs    = {},   -- AF.CreateFontString "lime"    (avg dps gain)
-    grpPlayers = {},   -- AF.CreateFontString "gray"    (player list)
+    grpNames   = {},   -- UIH.CreateFontString "white"   (dungeon name per group row)
+    grpAvgs    = {},   -- UIH.CreateFontString "lime"    (avg dps gain)
+    grpPlayers = {},   -- UIH.CreateFontString "gray"    (player list)
     grpSeps    = {},   -- sc:CreateTexture row separators
 }
 
@@ -201,7 +205,7 @@ local function RenderRow(poolSet, idx, parent, rowY, rowW, iconSize, rowH, item,
         nameStr = nameStr .. " |cffffaa00[C]|r"
     end
     row.nameText = PoolGet(poolSet.names, idx, function()
-        local f = AF.CreateFontString(parent, "", "white")
+        local f = UIH.CreateFontString(parent, "GameFontNormal", "white")
         f:SetWidth(rowW)
         f:SetWordWrap(false)
         f:SetNonSpaceWrap(false)
@@ -215,7 +219,7 @@ local function RenderRow(poolSet, idx, parent, rowY, rowW, iconSize, rowH, item,
     -- Slot · boss label (pooled font string), anchored below name
     local slotLabel = SLOT_LABELS[item.slot] or item.slot or ""
     row.slotText = PoolGet(poolSet.slots, idx, function()
-        local f = AF.CreateFontString(parent, "", "gray")
+        local f = UIH.CreateFontString(parent, "GameFontHighlightSmall", "gray")
         f:SetWidth(rowW)
         f:SetWordWrap(false)
         return f
@@ -225,9 +229,9 @@ local function RenderRow(poolSet, idx, parent, rowY, rowW, iconSize, rowH, item,
     row.slotText:SetText(slotLabel .. " · " .. (item.boss or ""))
     row.slotText:Show()
 
-    -- DPS gain (pooled font string), vertically centred on the row
+    -- DPS gain (pooled font string), anchored below [x] button
     row.dpsText = PoolGet(poolSet.dpss, idx, function()
-        return AF.CreateFontString(parent, "", "lime")
+        return UIH.CreateFontString(parent, "GameFontNormal", "lime")
     end)
     row.dpsText:ClearAllPoints()
     row.dpsText:SetPoint("TOPRIGHT", row.btn, "BOTTOMRIGHT", 0, -3)
@@ -267,28 +271,30 @@ end
 
 local function EnsureImportFrame()
     if importFrame then return end
-    if not AF then return end
+    if not UIH then return end
 
-    importFrame = AF.CreateHeaderedFrame(
-        AF.UIParent, "DroprImportFrame",
+    importFrame = UIH.CreateStyledFrame(
+        UIParent, "DroprImportFrame",
         "|cff00ccffDropr|r — Import",
         IMPORT_W, IMPORT_H
     )
     importFrame:SetFrameLevel(300)
-    importFrame:SetTitleJustify("LEFT")
     importFrame:Hide()
-    AF.SetPoint(importFrame, "CENTER")
-    AF.ApplyCombatProtectionToFrame(importFrame)
+    UIH.SetPoint(importFrame, "CENTER")
+    UIH.ApplyCombatProtection(importFrame)
+
+    -- Content starts below the header + stripe
+    local contentTop = -(INNER_TOP + PADDING)
 
     -- Site URL label + copyable edit box
-    local urlLabel = AF.CreateFontString(importFrame, "", "gray")
-    urlLabel:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -PADDING)
+    local urlLabel = UIH.CreateFontString(importFrame, "GameFontHighlightSmall", "gray")
+    urlLabel:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, contentTop)
     urlLabel:SetText("Get your import string at:")
 
     local urlBox = CreateFrame("EditBox", nil, importFrame, "InputBoxTemplate")
     urlBox:SetHeight(22)
-    urlBox:SetPoint("TOPLEFT",  importFrame, "TOPLEFT",  PADDING + 2, -PADDING - 18)
-    urlBox:SetPoint("TOPRIGHT", importFrame, "TOPRIGHT", -PADDING - 2, -PADDING - 18)
+    urlBox:SetPoint("TOPLEFT",  importFrame, "TOPLEFT",  PADDING + 2, contentTop - 18)
+    urlBox:SetPoint("TOPRIGHT", importFrame, "TOPRIGHT", -PADDING - 2, contentTop - 18)
     urlBox:SetText(DROPR_SITE_URL)
     urlBox:SetAutoFocus(false)
     urlBox:SetScript("OnEditFocusGained", function(self)
@@ -298,20 +304,20 @@ local function EnsureImportFrame()
     urlBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
     -- Instruction label
-    local hint = AF.CreateFontString(importFrame, "", "gray")
-    hint:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -PADDING - 46)
+    local hint = UIH.CreateFontString(importFrame, "GameFontHighlightSmall", "gray")
+    hint:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, contentTop - 46)
     hint:SetPoint("RIGHT",   importFrame, "RIGHT",   -PADDING, 0)
     hint:SetText("Paste your import string below, then click Confirm.")
 
     -- Scrollable edit box
-    local ebH = IMPORT_H - 32 - 34 - 46 - PADDING
-    local scrollEB = AF.CreateScrollEditBox(importFrame, nil, nil, IMPORT_W - PADDING * 2, ebH)
-    scrollEB:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, -32 - 46)
+    local ebH = IMPORT_H - INNER_TOP - PADDING - 34 - 46 - PADDING
+    local scrollEB = UIH.CreateScrollEditBox(importFrame, IMPORT_W - PADDING * 2, ebH)
+    scrollEB:SetPoint("TOPLEFT", importFrame, "TOPLEFT", PADDING, contentTop - 46 - 16)
     scrollEB:SetPoint("RIGHT",   importFrame, "RIGHT",   -PADDING, 0)
     importEditBox = scrollEB
 
     -- Confirm button
-    local confirmBtn = AF.CreateButton(importFrame, "Confirm", "green", 100, 24)
+    local confirmBtn = UIH.CreateButton(importFrame, "Confirm", 100, 24, "green")
     confirmBtn:SetPoint("BOTTOMRIGHT", importFrame, "BOTTOMRIGHT", -PADDING, PADDING)
     confirmBtn:SetScript("OnClick", function()
         local str = scrollEB.eb:GetText()
@@ -330,7 +336,7 @@ local function EnsureImportFrame()
     end)
 
     -- Cancel button
-    local cancelBtn = AF.CreateButton(importFrame, "Cancel", "red", 80, 24)
+    local cancelBtn = UIH.CreateButton(importFrame, "Cancel", 80, 24, "red")
     cancelBtn:SetPoint("RIGHT", confirmBtn, "LEFT", -6, 0)
     cancelBtn:SetScript("OnClick", function()
         scrollEB.eb:SetText("")
@@ -344,53 +350,53 @@ end
 
 local function BuildMainFrame()
     if mainFrame then return end
-    if not AF then return end
+    if not UIH then return end
 
-    mainFrame = AF.CreateHeaderedFrame(
-        AF.UIParent, "DroprMainFrame",
+    mainFrame = UIH.CreateStyledFrame(
+        UIParent, "DroprMainFrame",
         "|cff00ccffDropr|r",
         MAIN_W, MAIN_H
     )
     mainFrame:SetFrameLevel(200)
-    mainFrame:SetTitleJustify("LEFT")
     mainFrame:Hide()
-    AF.SetPoint(mainFrame, "CENTER")
-    AF.ApplyCombatProtectionToFrame(mainFrame)
+    UIH.SetPoint(mainFrame, "CENTER")
+    UIH.ApplyCombatProtection(mainFrame)
 
-    -- Mover
-    AF.CreateMover(mainFrame, "DroprMain", "Dropr Main", function(p, x, y)
+    -- Mover (uses the header as drag handle, persists position)
+    UIH.CreateMover(mainFrame, "DroprMain", "Dropr Main", function(p, x, y)
         DroprDB.mainPos = { p, x, y }
     end)
 
-    -- Top bar: char name · spec · import date
-    local charLabel = AF.CreateFontString(mainFrame, "", "accent")
-    charLabel:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", PADDING, -PADDING)
+    -- Top bar: char name · spec · import date (below header)
+    local charLabel = UIH.CreateFontString(mainFrame, "GameFontNormal", "accent")
+    charLabel:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", PADDING, -(INNER_TOP + PADDING))
     mainFrame.charLabel = charLabel
 
-    local specLabelMain = AF.CreateFontString(mainFrame, "", "gray")
+    local specLabelMain = UIH.CreateFontString(mainFrame, "GameFontHighlightSmall", "gray")
     specLabelMain:SetPoint("LEFT", charLabel, "RIGHT", 8, 0)
     mainFrame.specLabel = specLabelMain
 
-    local dateLabel = AF.CreateFontString(mainFrame, "", "gray")
-    dateLabel:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", -PADDING, -PADDING)
+    local dateLabel = UIH.CreateFontString(mainFrame, "GameFontHighlightSmall", "gray")
+    dateLabel:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", -PADDING, -(INNER_TOP + PADDING))
     mainFrame.dateLabel = dateLabel
 
     -- Separator under top bar
+    local topBarSepY = -(INNER_TOP + PADDING + 20)
     local sep = mainFrame:CreateTexture(nil, "BACKGROUND")
     sep:SetHeight(1)
     sep:SetColorTexture(0.3, 0.3, 0.3, 0.6)
-    sep:SetPoint("TOPLEFT",  mainFrame, "TOPLEFT",  PADDING,  -30)
-    sep:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", -PADDING, -30)
+    sep:SetPoint("TOPLEFT",  mainFrame, "TOPLEFT",  PADDING,  topBarSepY)
+    sep:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", -PADDING, topBarSepY)
 
     -- Bottom button bar
-    local importBtn = AF.CreateButton(mainFrame, "Import", "blue", 90, 24)
+    local importBtn = UIH.CreateButton(mainFrame, "Import", 90, 24, "blue")
     importBtn:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMLEFT", PADDING, PADDING)
     importBtn:SetScript("OnClick", function()
         mainFrame:Hide()
         DroprUI.OpenImport()
     end)
 
-    local clearBtn = AF.CreateButton(mainFrame, "Clear", "red", 70, 24)
+    local clearBtn = UIH.CreateButton(mainFrame, "Clear", 70, 24, "red")
     clearBtn:SetPoint("LEFT", importBtn, "RIGHT", 6, 0)
     clearBtn:SetScript("OnClick", function()
         DroprDB.importedAt = nil
@@ -402,7 +408,7 @@ local function BuildMainFrame()
         mainFrame:Hide()
     end)
 
-    local closeBtn = AF.CreateButton(mainFrame, "Close", "gray", 70, 24)
+    local closeBtn = UIH.CreateButton(mainFrame, "Close", 70, 24, "gray")
     closeBtn:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -PADDING, PADDING)
     closeBtn:SetScript("OnClick", function() mainFrame:Hide() end)
 
@@ -413,9 +419,10 @@ local function BuildMainFrame()
     sep2:SetPoint("BOTTOMLEFT",  mainFrame, "BOTTOMLEFT",  PADDING,  38)
     sep2:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -PADDING, 38)
 
-    -- Scroll area
+    -- Scroll area (starts below top bar separator)
+    local scrollTop = -(INNER_TOP + PADDING + 22)
     local scrollContainer = CreateFrame("Frame", nil, mainFrame)
-    scrollContainer:SetPoint("TOPLEFT",     mainFrame, "TOPLEFT",     0,  -34)
+    scrollContainer:SetPoint("TOPLEFT",     mainFrame, "TOPLEFT",     0,  scrollTop)
     scrollContainer:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", 0,   40)
 
     local scrollFrame = CreateFrame("ScrollFrame", "DroprMainScroll", scrollContainer, "UIPanelScrollFrameTemplate")
@@ -480,7 +487,7 @@ local function RefreshMainFrame()
         -- Section heading: "Group"
         pGrpTitle = pGrpTitle + 1
         local grpHeading = PoolGet(mainPool.grpTitle, pGrpTitle, function()
-            return AF.CreateFontString(sc, "", "accent")
+            return UIH.CreateFontString(sc, "GameFontNormal", "accent")
         end)
         grpHeading:ClearAllPoints()
         grpHeading:SetPoint("TOPLEFT", sc, "TOPLEFT", PADDING, -(totalH + PADDING))
@@ -509,7 +516,7 @@ local function RefreshMainFrame()
             -- Dungeon name
             pGrpName = pGrpName + 1
             local gname = PoolGet(mainPool.grpNames, pGrpName, function()
-                local f = AF.CreateFontString(sc, "", "white")
+                local f = UIH.CreateFontString(sc, "GameFontNormal", "white")
                 f:SetWidth(ROW_W + ICON_SIZE + 6 - 80)
                 f:SetWordWrap(false)
                 f:SetNonSpaceWrap(false)
@@ -528,7 +535,7 @@ local function RefreshMainFrame()
             -- Avg DPS gain (right side)
             pGrpAvg = pGrpAvg + 1
             local gavg = PoolGet(mainPool.grpAvgs, pGrpAvg, function()
-                return AF.CreateFontString(sc, "", "lime")
+                return UIH.CreateFontString(sc, "GameFontNormal", "lime")
             end)
             gavg:ClearAllPoints()
             gavg:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -PADDING, rowY - 6)
@@ -538,7 +545,7 @@ local function RefreshMainFrame()
             -- Player list (small gray text below dungeon name)
             pGrpPlayer = pGrpPlayer + 1
             local gplayers = PoolGet(mainPool.grpPlayers, pGrpPlayer, function()
-                local f = AF.CreateFontString(sc, "", "gray")
+                local f = UIH.CreateFontString(sc, "GameFontHighlightSmall", "gray")
                 f:SetWidth(ROW_W + ICON_SIZE + 6 - 80)
                 f:SetWordWrap(false)
                 return f
@@ -597,7 +604,7 @@ local function RefreshMainFrame()
 
         pDname = pDname + 1
         local empty = PoolGet(mainPool.dnames, pDname, function()
-            return AF.CreateFontString(sc, "", "gray")
+            return UIH.CreateFontString(sc, "GameFontHighlightSmall", "gray")
         end)
         empty:ClearAllPoints()
         empty:SetPoint("TOPLEFT", sc, "TOPLEFT", PADDING, -(totalH + PADDING))
@@ -635,7 +642,7 @@ local function RefreshMainFrame()
         -- Dungeon name header (pooled)
         pDname = pDname + 1
         local dname = PoolGet(mainPool.dnames, pDname, function()
-            return AF.CreateFontString(sc, "", "accent")
+            return UIH.CreateFontString(sc, "GameFontNormal", "accent")
         end)
         dname:ClearAllPoints()
         dname:SetPoint("TOPLEFT", sc, "TOPLEFT", PADDING, sectionY - PADDING)
@@ -645,7 +652,7 @@ local function RefreshMainFrame()
         -- Item count label, right-aligned on same Y as dungeon header
         pCount = pCount + 1
         local itemCount = PoolGet(mainPool.counts, pCount, function()
-            return AF.CreateFontString(sc, "", "gray")
+            return UIH.CreateFontString(sc, "GameFontHighlightSmall", "gray")
         end)
         itemCount:ClearAllPoints()
         itemCount:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -PADDING, sectionY - PADDING)
@@ -683,29 +690,28 @@ end
 
 local function EnsureFrame()
     if frame then return end
-    if not AF then return end
+    if not UIH then return end
 
-    frame = AF.CreateHeaderedFrame(AF.UIParent, "DroprReminderFrame", "|cff00ccffDropr|r", FRAME_WIDTH, 100)
+    frame = UIH.CreateStyledFrame(UIParent, "DroprReminderFrame", "|cff00ccffDropr|r", FRAME_WIDTH, 100)
     frame:SetFrameLevel(200)
-    frame:SetTitleJustify("LEFT")
     frame:Hide()
 
-    -- Dungeon name label
-    dungeonLabel = AF.CreateFontString(frame, "", "accent")
-    dungeonLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -6)
+    -- Dungeon name label (below header)
+    dungeonLabel = UIH.CreateFontString(frame, "GameFontNormal", "accent")
+    dungeonLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, -(INNER_TOP + 6))
     dungeonLabel:SetPoint("RIGHT", frame, "RIGHT", -PADDING, 0)
 
-    -- Spec label (right-aligned, overlaps dungeon label but aligned to right edge)
-    specLabel = AF.CreateFontString(frame, "", "gray")
-    specLabel:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PADDING, -6)
+    -- Spec label (right-aligned on same row as dungeon label)
+    specLabel = UIH.CreateFontString(frame, "GameFontHighlightSmall", "gray")
+    specLabel:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PADDING, -(INNER_TOP + 6))
 
     -- Content frame for item rows, starts below the label row
     contentFrame = CreateFrame("Frame", nil, frame)
-    contentFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -LABEL_H)
+    contentFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -(INNER_TOP + LABEL_H))
     contentFrame:SetPoint("RIGHT",   frame, "RIGHT",   0, 0)
 
-    -- Mover
-    AF.CreateMover(frame, "Dropr", "Dropr Reminder", function(p, x, y)
+    -- Mover (persists position)
+    UIH.CreateMover(frame, "Dropr", "Dropr Reminder", function(p, x, y)
         DroprDB.framePos = { p, x, y }
     end)
 
@@ -715,10 +721,10 @@ local function EnsureFrame()
         frame:ClearAllPoints()
         frame:SetPoint(pos[1] or "CENTER", UIParent, pos[1] or "CENTER", pos[2] or 0, pos[3] or 0)
     else
-        AF.SetPoint(frame, "CENTER")
+        UIH.SetPoint(frame, "CENTER")
     end
 
-    AF.ApplyCombatProtectionToFrame(frame)
+    UIH.ApplyCombatProtection(frame)
 end
 
 -- ---------------------------------------------------------------------------
@@ -758,7 +764,7 @@ function DroprUI.ShowDungeon(instanceId)
     if #groupMembers > 0 then
         GROUP_FOOTER_H = 20
         local gf = PoolGet(reminderGroupPool, 1, function()
-            local f = AF.CreateFontString(contentFrame, "", "gray")
+            local f = UIH.CreateFontString(contentFrame, "GameFontHighlightSmall", "gray")
             f:SetPoint("BOTTOMLEFT", contentFrame, "BOTTOMLEFT", PADDING, PADDING)
             f:SetPoint("RIGHT", contentFrame, "RIGHT", -PADDING, 0)
             f:SetWordWrap(false)
@@ -774,7 +780,7 @@ function DroprUI.ShowDungeon(instanceId)
     end
 
     local contentH = n * (ROW_HEIGHT + ROW_GAP) + PADDING + GROUP_FOOTER_H
-    local totalH   = LABEL_H + contentH
+    local totalH   = INNER_TOP + LABEL_H + contentH
 
     -- Set height before Show() to avoid the one-frame layout glitch on first open
     frame:SetHeight(totalH)
