@@ -71,7 +71,7 @@ local currentInstanceId
 -- Zone reminder frame: grow-only pools to avoid permanent WoW child accumulation.
 -- WoW cannot destroy font strings or textures once created; we reuse them instead.
 local rowPool = {
-    icons    = {},  -- contentFrame:CreateTexture objects
+    icons    = {},  -- mouse-enabled Frame wrappers (._tex = ARTWORK texture, ._itemId = item id)
     names    = {},  -- UIH.CreateFontString "white"
     slots    = {},  -- UIH.CreateFontString "gray"
     dpss     = {},  -- UIH.CreateFontString "lime"
@@ -93,7 +93,7 @@ local mainFrame
 local mainPool = {
     dnames     = {},   -- UIH.CreateFontString "accent"  (dungeon headers)
     counts     = {},   -- UIH.CreateFontString "gray"    (item count labels)
-    icons      = {},   -- sc:CreateTexture
+    icons      = {},   -- mouse-enabled Frame wrappers (._tex = ARTWORK texture, ._itemId = item id)
     nameFs     = {},   -- UIH.CreateFontString "white"   (item names)
     slotFs     = {},   -- UIH.CreateFontString "gray"    (slot · boss)
     dpsFs      = {},   -- UIH.CreateFontString "lime"    (dps gain)
@@ -175,16 +175,29 @@ end
 local function RenderRow(poolSet, idx, parent, rowY, rowW, iconSize, rowH, item, instanceId)
     local row = {}
 
-    -- Icon (pooled texture)
+    -- Icon (pooled mouse-enabled frame wrapping a texture, to support tooltips)
     row.icon = PoolGet(poolSet.icons, idx, function()
-        local t = parent:CreateTexture(nil, "ARTWORK")
-        t:SetSize(iconSize, iconSize)
-        return t
+        local f = CreateFrame("Frame", nil, parent)
+        f:SetSize(iconSize, iconSize)
+        f:EnableMouse(true)
+        local t = f:CreateTexture(nil, "ARTWORK")
+        t:SetAllPoints()
+        f._tex = t
+        f:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink("item:" .. (self._itemId or 0))
+            GameTooltip:Show()
+        end)
+        f:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+        return f
     end)
+    row.icon._itemId = item.id
     row.icon:ClearAllPoints()
     row.icon:SetPoint("TOPLEFT", parent, "TOPLEFT", PADDING, rowY - 6)
     local iconPath = item.icon and ("Interface\\Icons\\" .. item.icon) or "Interface\\Icons\\INV_Misc_QuestionMark"
-    row.icon:SetTexture(iconPath)
+    row.icon._tex:SetTexture(iconPath)
     row.icon:Show()
 
     -- [x] remove button (pooled), anchored top-right
