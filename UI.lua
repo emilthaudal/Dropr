@@ -185,7 +185,17 @@ local function RenderRow(poolSet, idx, parent, rowY, rowW, iconSize, rowH, item,
         f._tex = t
         f:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink("item:" .. (self._itemId or 0))
+            local ids = self._bonusIds
+            if ids and #ids > 0 then
+                -- item:id:0:0:0:0:0:0:0:0:0:0:0:numBonusIds:bid1:bid2:...
+                local link = "item:" .. (self._itemId or 0) .. ":0:0:0:0:0:0:0:0:0:0:0:" .. #ids
+                for _, bid in ipairs(ids) do
+                    link = link .. ":" .. bid
+                end
+                GameTooltip:SetHyperlink(link)
+            else
+                GameTooltip:SetHyperlink("item:" .. (self._itemId or 0))
+            end
             GameTooltip:Show()
         end)
         f:SetScript("OnLeave", function()
@@ -193,7 +203,8 @@ local function RenderRow(poolSet, idx, parent, rowY, rowW, iconSize, rowH, item,
         end)
         return f
     end)
-    row.icon._itemId = item.id
+    row.icon._itemId   = item.id
+    row.icon._bonusIds = item.bonusIds  -- nil or table of ints; nil treated as no bonus IDs
     row.icon:ClearAllPoints()
     row.icon:SetPoint("TOPLEFT", parent, "TOPLEFT", PADDING, rowY - 6)
     local iconPath = item.icon and ("Interface\\Icons\\" .. item.icon) or "Interface\\Icons\\INV_Misc_QuestionMark"
