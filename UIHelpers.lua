@@ -197,12 +197,12 @@ function UIH.CreateScrollEditBox(parent, w, h)
 
     scrollFrame:SetScrollChild(editBox)
 
-    -- Return a table that quacks like AF's scroll edit box result:
-    --   .eb = inner edit box  (used by UI.lua)
-    -- But also give the returned object the same frame methods via __index
-    -- so code can call :SetPoint() etc. on the "outer" container.
-    local obj = setmetatable({eb = editBox}, {__index = scrollFrame})
-    return obj
+    -- Attach .eb directly to the scrollFrame userdata so callers can do both
+    -- scrollEB:SetPoint(...) (native WoW frame call) and scrollEB.eb:GetText().
+    -- Returning a plain Lua table with __index=scrollFrame would cause
+    -- "Wrong object type for function" because WoW's C API rejects metatables.
+    scrollFrame.eb = editBox
+    return scrollFrame
 end
 
 -- ---------------------------------------------------------------------------
