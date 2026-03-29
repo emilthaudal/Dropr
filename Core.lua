@@ -176,8 +176,11 @@ end
 
 local function CheckStale()
     if not DroprDB.importedAt then return end
-    local ageSeconds = time() - DroprDB.importedAt
-    local ageDays = math.floor(ageSeconds / 86400)
+    -- Use calendar day boundaries (not elapsed seconds) to avoid off-by-one
+    -- when the import happened late one day and the addon is opened early the next.
+    local now = date("*t")
+    local imp = date("*t", DroprDB.importedAt)
+    local ageDays = (now.year * 365 + now.yday) - (imp.year * 365 + imp.yday)
     if ageDays >= DROPR_OUTDATED_DAYS then
         C_Timer.After(3, function()
             DroprPrint(string.format("Your droptimizer data is %d day(s) old. Consider re-importing.", ageDays))

@@ -452,11 +452,15 @@ local function RefreshMainFrame()
     end
 
     if DroprDB.importedAt then
-        local ageDays = math.floor((time() - DroprDB.importedAt) / 86400)
-        if ageDays == 0 then
+        -- Use calendar day boundaries, not elapsed seconds, to avoid off-by-one
+        -- when the import happened late one day and the addon is opened early the next.
+        local now = date("*t")
+        local imp = date("*t", DroprDB.importedAt)
+        local ageDays = (now.year * 365 + now.yday) - (imp.year * 365 + imp.yday)
+        if ageDays <= 0 then
             mainFrame.dateLabel:SetText("imported today")
         elseif ageDays == 1 then
-            mainFrame.dateLabel:SetText("1 day ago")
+            mainFrame.dateLabel:SetText("imported yesterday")
         else
             mainFrame.dateLabel:SetText(ageDays .. " days ago")
         end
